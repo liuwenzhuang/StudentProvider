@@ -1,31 +1,33 @@
 package com.example.lwz.studentprovider.provider;
 
 import android.content.ContentProvider;
+import android.content.ContentUris;
 import android.content.ContentValues;
-import android.database.ContentObserver;
+import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.net.Uri;
+
+import com.example.lwz.studentprovider.constant.DBConstant;
+import com.example.lwz.studentprovider.db.DBHelper;
 
 /**
  * Created by lwz on 2015/4/27.
  */
 public class StudentProvider extends ContentProvider {
-    /**
-     * Construct a ContentProvider instance.  Content providers must be
-     * <a href="{@docRoot}guide/topics/manifest/provider-element.html">declared
-     * in the manifest</a>, accessed with {@link ContentResolver}, and created
-     * automatically by the system, so applications usually do not create
-     * ContentProvider instances directly.
-     * <p/>
-     * <p>At construction time, the object is uninitialized, and most fields and
-     * methods are unavailable.  Subclasses should initialize themselves in
-     * {@link #onCreate}, not the constructor.
-     * <p/>
-     * <p>Content providers are created on the application main thread at
-     * application launch time.  The constructor must not perform lengthy
-     * operations, or application startup will be delayed.
-     */
+    public final static String AUTHORITY = "com.example.lwz.studentprovider.provider.StudentProvider";
+    public final static Uri CONTENTURI = Uri.parse("content://" + AUTHORITY + "/" + DBConstant.TABLE_NAME);
+    private static UriMatcher uriMatcher = null;
+    private static DBHelper dbHelper = null;
+    private final static int STUDENT = 1, STUDENTS = 2;
+
+    static {
+        uriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
+        uriMatcher.addURI(AUTHORITY, DBConstant.TABLE_NAME, STUDENTS);
+        uriMatcher.addURI(AUTHORITY, DBConstant.TABLE_NAME + "/#", STUDENT);
+    }
+
     public StudentProvider() {
         super();
     }
@@ -57,7 +59,8 @@ public class StudentProvider extends ContentProvider {
      */
     @Override
     public boolean onCreate() {
-        return false;
+        dbHelper = new DBHelper(getContext());
+        return true;
     }
 
     /**
@@ -117,96 +120,91 @@ public class StudentProvider extends ContentProvider {
      */
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        return null;
+        Cursor cursor = null;
+        SQLiteDatabase database = dbHelper.getReadableDatabase();
+        switch (uriMatcher.match(uri)) {
+            case STUDENT:
+                long id = ContentUris.parseId(uri);
+                String where_args = " id = " + id;
+                if(selection!=null && !selection.equals("")) {
+                    where_args += " and " + selection;
+                }
+                cursor = database.query(DBConstant.TABLE_NAME, projection, where_args, selectionArgs, null, null, sortOrder);
+                break;
+            case STUDENTS:
+                cursor = database.query(DBConstant.TABLE_NAME, projection, selection, selectionArgs, null, null, sortOrder);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown uri:" + uri.toString());
+        }
+        return cursor;
     }
 
-    /**
-     * Implement this to handle requests for the MIME type of the data at the
-     * given URI.  The returned MIME type should start with
-     * <code>vnd.android.cursor.item</code> for a single record,
-     * or <code>vnd.android.cursor.dir/</code> for multiple items.
-     * This method can be called from multiple threads, as described in
-     * <a href="{@docRoot}guide/topics/fundamentals/processes-and-threads.html#Threads">Processes
-     * and Threads</a>.
-     * <p/>
-     * <p>Note that there are no permissions needed for an application to
-     * access this information; if your content provider requires read and/or
-     * write permissions, or is not exported, all applications can still call
-     * this method regardless of their access permissions.  This allows them
-     * to retrieve the MIME type for a URI when dispatching intents.
-     *
-     * @param uri the URI to query.
-     * @return a MIME type string, or {@code null} if there is no type.
-     */
     @Override
     public String getType(Uri uri) {
-        return null;
+        switch (uriMatcher.match(uri)) {
+            case STUDENT:
+                return "vnd.android.cursor.item/vnd.com.example.lwz.studentprovider.provider.StudentProvider." + DBConstant.TABLE_NAME;
+            case STUDENTS:
+                return "vnd.android.cursor.item/vnd.com.example.lwz.studentprovider.provider.StudentProvider." + DBConstant.TABLE_NAME;
+            default:
+                throw new IllegalArgumentException("Unknown uri:" + uri.toString());
+        }
     }
 
-    /**
-     * Implement this to handle requests to insert a new row.
-     * As a courtesy, call {@link ContentResolver#notifyChange(Uri, ContentObserver) notifyChange()}
-     * after inserting.
-     * This method can be called from multiple threads, as described in
-     * <a href="{@docRoot}guide/topics/fundamentals/processes-and-threads.html#Threads">Processes
-     * and Threads</a>.
-     *
-     * @param uri    The content:// URI of the insertion request. This must not be {@code null}.
-     * @param values A set of column_name/value pairs to add to the database.
-     *               This must not be {@code null}.
-     * @return The URI for the newly inserted item.
-     */
     @Override
     public Uri insert(Uri uri, ContentValues values) {
-        return null;
+        Uri resultUri = null;
+        SQLiteDatabase database = dbHelper.getWritableDatabase();
+        if(uriMatcher.match(uri) != STUDENTS)
+            throw new IllegalArgumentException("Unknown uri:"+uri);
+        long id = database.insert(DBConstant.TABLE_NAME, null, values);
+        if(id > 0)
+            resultUri = ContentUris.withAppendedId(CONTENTURI, id);
+        return resultUri;
     }
 
-    /**
-     * Implement this to handle requests to delete one or more rows.
-     * The implementation should apply the selection clause when performing
-     * deletion, allowing the operation to affect multiple rows in a directory.
-     * As a courtesy, call {@link ContentResolver#notifyChange(Uri, ContentObserver) notifyChange()}
-     * after deleting.
-     * This method can be called from multiple threads, as described in
-     * <a href="{@docRoot}guide/topics/fundamentals/processes-and-threads.html#Threads">Processes
-     * and Threads</a>.
-     * <p/>
-     * <p>The implementation is responsible for parsing out a row ID at the end
-     * of the URI, if a specific row is being deleted. That is, the client would
-     * pass in <code>content://contacts/people/22</code> and the implementation is
-     * responsible for parsing the record number (22) when creating a SQL statement.
-     *
-     * @param uri           The full URI to query, including a row ID (if a specific record is requested).
-     * @param selection     An optional restriction to apply to rows when deleting.
-     * @param selectionArgs
-     * @return The number of rows affected.
-     * @throws SQLException
-     */
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        return 0;
+        int result = 0;
+        SQLiteDatabase database = dbHelper.getWritableDatabase();
+        switch (uriMatcher.match(uri)) {
+            case STUDENT:
+                long id = ContentUris.parseId(uri);
+                String where_args = " id = " + id;
+                if(selection!=null && !selection.equals("")) {
+                    where_args += " and " + selection;
+                }
+                result = database.delete(DBConstant.TABLE_NAME, where_args, selectionArgs);
+                break;
+            case STUDENTS:
+                result = database.delete(DBConstant.TABLE_NAME, selection, selectionArgs);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown uri:" + uri.toString());
+        }
+        return result;
     }
 
-    /**
-     * Implement this to handle requests to update one or more rows.
-     * The implementation should update all rows matching the selection
-     * to set the columns according to the provided values map.
-     * As a courtesy, call {@link ContentResolver#notifyChange(Uri, ContentObserver) notifyChange()}
-     * after updating.
-     * This method can be called from multiple threads, as described in
-     * <a href="{@docRoot}guide/topics/fundamentals/processes-and-threads.html#Threads">Processes
-     * and Threads</a>.
-     *
-     * @param uri           The URI to query. This can potentially have a record ID if this
-     *                      is an update request for a specific record.
-     * @param values        A set of column_name/value pairs to update in the database.
-     *                      This must not be {@code null}.
-     * @param selection     An optional filter to match rows to update.
-     * @param selectionArgs
-     * @return the number of rows affected.
-     */
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        return 0;
+        int result = 0;
+        SQLiteDatabase database = dbHelper.getWritableDatabase();
+        switch (uriMatcher.match(uri)) {
+            case STUDENT:
+                long id = ContentUris.parseId(uri);
+                String where_args = " id = " + id;
+                if(selection!=null && !selection.equals("")) {
+                    where_args += " and " + selection;
+                }
+                result = database.update(DBConstant.TABLE_NAME, values, where_args, selectionArgs);
+                break;
+            case STUDENTS:
+                result = database.update(DBConstant.TABLE_NAME, values, selection, selectionArgs);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown uri:" + uri.toString());
+        }
+        return result;
     }
 }
