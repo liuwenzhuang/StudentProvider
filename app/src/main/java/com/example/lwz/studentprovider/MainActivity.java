@@ -12,12 +12,16 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewConfiguration;
 import android.widget.EditText;
 import android.widget.ListView;
 
 import com.example.lwz.studentprovider.adapter.StudentAdapter;
 import com.example.lwz.studentprovider.constant.DBConstant;
 
+import java.lang.reflect.Field;
+import java.text.Format;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +37,7 @@ public class MainActivity extends ActionBarActivity implements LoaderManager.Loa
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getOverflowMenu();
         editText = (EditText) findViewById(R.id.editText);
         listView = (ListView) findViewById(R.id.listView);
         editText.addTextChangedListener(new TextWatcher() {
@@ -43,14 +48,12 @@ public class MainActivity extends ActionBarActivity implements LoaderManager.Loa
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                Log.i(TAG, "onTextChanged():" + s);
                 where_args = s.toString();
                 loaderManager.restartLoader(1000, null, MainActivity.this);
             }
 
             @Override
             public void afterTextChanged(Editable s) {
-                Log.i(TAG, "afterTextChanged():" + s);
             }
         });
         loaderManager = getSupportLoaderManager();
@@ -61,7 +64,21 @@ public class MainActivity extends ActionBarActivity implements LoaderManager.Loa
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    private void getOverflowMenu() {
+        try {
+            ViewConfiguration config = ViewConfiguration.get(this);
+            Field menuKeyField = ViewConfiguration.class
+                    .getDeclaredField("sHasPermanentMenuKey");
+            if (menuKeyField != null) {
+                menuKeyField.setAccessible(true);
+                menuKeyField.setBoolean(config, false);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
