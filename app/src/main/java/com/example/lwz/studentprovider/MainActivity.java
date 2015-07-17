@@ -44,9 +44,6 @@ public class MainActivity extends ActionBarActivity implements LoaderManager.Loa
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 Log.i(TAG, "onTextChanged():" + s);
-                /*Bundle args = new Bundle();
-                args.putCharSequence("student_name", s);
-                getSupportLoaderManager().restartLoader(1000, args, MainActivity.this);*/
                 where_args = s.toString();
                 loaderManager.restartLoader(1000, null, MainActivity.this);
             }
@@ -98,7 +95,7 @@ public class MainActivity extends ActionBarActivity implements LoaderManager.Loa
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         Log.i(TAG, "onLoadFinished");
-        List<String> list = new ArrayList<String>();
+        List<String> list = new ArrayList<>();
         while(data!=null&&data.moveToNext()) {
             list.add(data.getString(data.getColumnIndex(DBConstant.COLUMN_NAME)));
         }
